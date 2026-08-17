@@ -260,4 +260,118 @@ with col_left:
     )
     st.caption(
         "Tip: use square-ish or portrait images close to your trim size's aspect "
-        "ratio — the tool crops
+        "ratio — the tool crops to fill each panel exactly, like a photo frame."
+    )
+
+with col_right:
+    st.subheader("⚙️ Book settings")
+    size_label = st.selectbox("Trim size", options=list(BOOK_SIZES.keys()), index=0)
+    trim_w, trim_h = BOOK_SIZES[size_label]
+
+    page_count = st.number_input(
+        "Interior page count", min_value=MIN_PAGES, value=100, step=2,
+        help="KDP requires a minimum of 24 pages for a paperback.",
+    )
+
+    paper_label = st.selectbox("Interior paper color", options=list(PAPER_TYPES.keys()))
+    spine_factor = PAPER_TYPES[paper_label]
+
+    spine_w_in, panel_w_in, full_w_in, full_h_in = calc_dimensions(
+        trim_w, trim_h, page_count, spine_factor
+    )
+
+    st.markdown(
+        f"<div class='info-card'>"
+        f"<b>Spine width:</b> {spine_w_in:.3f} in<br>"
+        f"<b>Full wrap size:</b> {full_w_in:.3f} × {full_h_in:.3f} in "
+        f"(includes {BLEED_IN}in bleed on all outer edges)"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    default_spine_color = "#2d2d2d"
+    if front_file is not None:
+        try:
+            _front_preview = Image.open(front_file)
+            default_spine_color = sample_edge_color(
+                _front_preview, round(panel_w_in * DPI), round(full_h_in * DPI)
+            )
+            front_file.seek(0)
+        except Exception:
+            pass
+
+    spine_color = st.color_picker(
+        "Spine color", value=default_spine_color,
+        help="Auto-suggested from your front cover's edge — feel free to change it.",
+    )
+
+if not front_file or not back_file:
+    st.markdown(
+        "<div class='info-card'>"
+        "<b>How it works</b><br>"
+        "1. Upload your front cover art and back cover art (from Canva, your own AI tool, etc.)<br>"
+        "2. Enter your page count and paper color — the spine width updates automatically<br>"
+        "3. Pick a spine color (or use the auto-suggested one)<br>"
+        "4. Preview, then download your print-ready full-wrap PDF"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+else:
+    front_img = Image.open(front_file)
+    back_img = Image.open(back_file)
+
+    if st.button("🔍 Preview Cover", width="stretch"):
+        with st.spinner("Building your cover..."):
+            canvas, full_w_px, full_h_px, spine_w_px, panel_w_px = build_cover(
+                front_img, back_img, trim_w, trim_h, page_count, spine_factor, spine_color
+            )
+            preview_img = add_preview_guides(canvas, panel_w_px, full_h_px)
+
+        st.session_state["cover_result"] = {
+            "canvas": canvas,
+            "preview": preview_img,
+            "full_w_in": full_w_in,
+            "full_h_in": full_h_in,
+        }
+
+if "cover_result" in st.session_state:
+    st.markdown("---")
+    st.subheader("👀 Preview")
+    result = st.session_state["cover_result"]
+    st.image(result["preview"], width="stretch")
+    st.markdown(
+        "<div class='warn-card'>"
+        "🔵 <b>Blue dashed line</b> = the trim line. Everything OUTSIDE this line is "
+        "bleed — it gets physically cut off when your book is printed.<br>"
+        "🟡 <b>Yellow dashed line</b> = safe zone. Keep titles, text, and important art "
+        "inside this line so nothing looks accidentally cropped, even if the printer's "
+        "cutter is slightly off.<br>"
+        "🔴 <b>Red dashed box</b> = approximate barcode safe zone. KDP stamps the real "
+        "ISBN barcode there automatically after you publish — keep that corner of your "
+        "back cover free of important text or images.<br>"
+        "All three guides are for preview only and will NOT appear in your downloaded "
+        "file. Always confirm the final placement in KDP's own cover previewer before "
+        "publishing."
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    buf = io.BytesIO()
+    result["canvas"].save(buf, format="PDF", resolution=float(DPI))
+    buf.seek(0)
+
+    st.download_button(
+        "⬇️ Download Print-Ready Cover PDF",
+        data=buf,
+        file_name="kdp_full_wrap_cover.pdf",
+        mime="application/pdf",
+        width="stretch",
+    )
+
+st.markdown("---")
+st.markdown(
+    f"<p style='text-align:center;color:#94a3b8;font-size:0.85rem;'>"
+    f"✨ Exclusive tool by <b>{BRAND_NAME}</b> • Made for self-publishers"
+    f"</p>",
+    unsafe_allow_html=True,
+)
