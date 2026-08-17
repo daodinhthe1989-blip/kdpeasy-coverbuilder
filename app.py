@@ -120,6 +120,11 @@ BARCODE_W_IN = 2.0
 BARCODE_H_IN = 1.2
 BARCODE_INSET_IN = 0.25
 
+# General safe zone: keep titles/text/important art this far inside the
+# trim line (industry-standard guidance) so nothing looks accidentally
+# cropped, even if the physical cutter is slightly off.
+SAFE_ZONE_IN = 0.25
+
 
 def calc_dimensions(trim_w, trim_h, page_count, spine_factor):
     spine_w_in = page_count * spine_factor
@@ -154,30 +159,53 @@ def build_cover(front_img, back_img, trim_w, trim_h, page_count, spine_factor, s
     return canvas, full_w_px, full_h_px, spine_w_px, panel_w_px
 
 
-def add_barcode_guide(canvas, panel_w_px, full_h_px):
-    """Draw a dashed guide box for preview only — NOT included in the final download."""
+def _dashed_rect(draw, x0, y0, x1, y1, color, dash=14, width=4):
+    for x in range(x0, x1, dash * 2):
+        draw.line([(x, y0), (min(x + dash, x1), y0)], fill=color, width=width)
+        draw.line([(x, y1), (min(x + dash, x1), y1)], fill=color, width=width)
+    for y in range(y0, y1, dash * 2):
+        draw.line([(x0, y), (x0, min(y + dash, y1))], fill=color, width=width)
+        draw.line([(x1, y), (x1, min(y + dash, y1))], fill=color, width=width)
+
+
+def add_preview_guides(canvas, panel_w_px, full_h_px):
+    """Draw guide lines for preview only — NOT included in the final download."""
     preview = canvas.copy()
     draw = ImageDraw.Draw(preview)
+    full_w_px = preview.width
 
     bleed_px = round(BLEED_IN * DPI)
+
+    # Trim line (blue) — everything OUTSIDE this rectangle is bleed and
+    # gets physically cut off by the printer. Marks top/bottom/outer-left/
+    # outer-right; the spine's own edges never get bleed since they're
+    # folded, not cut, so a single rectangle across the full width is correct.
+    _dashed_rect(
+        draw,
+        bleed_px, bleed_px,
+        full_w_px - bleed_px, full_h_px - bleed_px,
+        color="#3b82f6",
+    )
+
+    # General safe zone (amber) — keep titles/text/important art inside this
+    # line, 0.25in further in from the trim line, on all outer trim edges.
+    safe_px = bleed_px + round(SAFE_ZONE_IN * DPI)
+    _dashed_rect(
+        draw,
+        safe_px, safe_px,
+        full_w_px - safe_px, full_h_px - safe_px,
+        color="#f59e0b",
+    )
+
+    # Barcode safe zone (red) — bottom-right corner of the back cover panel
     inset_px = round(BARCODE_INSET_IN * DPI)
     bw_px = round(BARCODE_W_IN * DPI)
     bh_px = round(BARCODE_H_IN * DPI)
-
     right_x = panel_w_px - inset_px
     left_x = right_x - bw_px
     bottom_y = (full_h_px - bleed_px) - inset_px
     top_y = bottom_y - bh_px
-
-    # dashed rectangle
-    dash = 14
-    x0, y0, x1, y1 = left_x, top_y, right_x, bottom_y
-    for x in range(x0, x1, dash * 2):
-        draw.line([(x, y0), (min(x + dash, x1), y0)], fill="#ef4444", width=4)
-        draw.line([(x, y1), (min(x + dash, x1), y1)], fill="#ef4444", width=4)
-    for y in range(y0, y1, dash * 2):
-        draw.line([(x0, y), (x0, min(y + dash, y1))], fill="#ef4444", width=4)
-        draw.line([(x1, y), (x1, min(y + dash, y1))], fill="#ef4444", width=4)
+    _dashed_rect(draw, left_x, top_y, right_x, bottom_y, color="#ef4444")
 
     return preview
 
@@ -232,112 +260,4 @@ with col_left:
     )
     st.caption(
         "Tip: use square-ish or portrait images close to your trim size's aspect "
-        "ratio — the tool crops to fill each panel exactly, like a photo frame."
-    )
-
-with col_right:
-    st.subheader("⚙️ Book settings")
-    size_label = st.selectbox("Trim size", options=list(BOOK_SIZES.keys()), index=0)
-    trim_w, trim_h = BOOK_SIZES[size_label]
-
-    page_count = st.number_input(
-        "Interior page count", min_value=MIN_PAGES, value=100, step=2,
-        help="KDP requires a minimum of 24 pages for a paperback.",
-    )
-
-    paper_label = st.selectbox("Interior paper color", options=list(PAPER_TYPES.keys()))
-    spine_factor = PAPER_TYPES[paper_label]
-
-    spine_w_in, panel_w_in, full_w_in, full_h_in = calc_dimensions(
-        trim_w, trim_h, page_count, spine_factor
-    )
-
-    st.markdown(
-        f"<div class='info-card'>"
-        f"<b>Spine width:</b> {spine_w_in:.3f} in<br>"
-        f"<b>Full wrap size:</b> {full_w_in:.3f} × {full_h_in:.3f} in "
-        f"(includes {BLEED_IN}in bleed on all outer edges)"
-        f"</div>",
-        unsafe_allow_html=True,
-    )
-
-    default_spine_color = "#2d2d2d"
-    if front_file is not None:
-        try:
-            _front_preview = Image.open(front_file)
-            default_spine_color = sample_edge_color(
-                _front_preview, round(panel_w_in * DPI), round(full_h_in * DPI)
-            )
-            front_file.seek(0)
-        except Exception:
-            pass
-
-    spine_color = st.color_picker(
-        "Spine color", value=default_spine_color,
-        help="Auto-suggested from your front cover's edge — feel free to change it.",
-    )
-
-if not front_file or not back_file:
-    st.markdown(
-        "<div class='info-card'>"
-        "<b>How it works</b><br>"
-        "1. Upload your front cover art and back cover art (from Canva, your own AI tool, etc.)<br>"
-        "2. Enter your page count and paper color — the spine width updates automatically<br>"
-        "3. Pick a spine color (or use the auto-suggested one)<br>"
-        "4. Preview, then download your print-ready full-wrap PDF"
-        "</div>",
-        unsafe_allow_html=True,
-    )
-else:
-    front_img = Image.open(front_file)
-    back_img = Image.open(back_file)
-
-    if st.button("🔍 Preview Cover", width="stretch"):
-        with st.spinner("Building your cover..."):
-            canvas, full_w_px, full_h_px, spine_w_px, panel_w_px = build_cover(
-                front_img, back_img, trim_w, trim_h, page_count, spine_factor, spine_color
-            )
-            preview_img = add_barcode_guide(canvas, panel_w_px, full_h_px)
-
-        st.session_state["cover_result"] = {
-            "canvas": canvas,
-            "preview": preview_img,
-            "full_w_in": full_w_in,
-            "full_h_in": full_h_in,
-        }
-
-if "cover_result" in st.session_state:
-    st.markdown("---")
-    st.subheader("👀 Preview")
-    result = st.session_state["cover_result"]
-    st.image(result["preview"], width="stretch")
-    st.markdown(
-        "<div class='warn-card'>"
-        "⚠️ <b>Red dashed box</b> = approximate barcode safe zone. KDP stamps the real "
-        "ISBN barcode there automatically after you publish — keep that corner of your "
-        "back cover free of important text or images. This box is for preview only and "
-        "will NOT appear in your downloaded file. Always confirm the final placement in "
-        "KDP's own cover previewer before publishing."
-        "</div>",
-        unsafe_allow_html=True,
-    )
-
-    buf = io.BytesIO()
-    result["canvas"].save(buf, format="PDF", resolution=float(DPI))
-    buf.seek(0)
-
-    st.download_button(
-        "⬇️ Download Print-Ready Cover PDF",
-        data=buf,
-        file_name="kdp_full_wrap_cover.pdf",
-        mime="application/pdf",
-        width="stretch",
-    )
-
-st.markdown("---")
-st.markdown(
-    f"<p style='text-align:center;color:#94a3b8;font-size:0.85rem;'>"
-    f"✨ Exclusive tool by <b>{BRAND_NAME}</b> • Made for self-publishers"
-    f"</p>",
-    unsafe_allow_html=True,
-)
+        "ratio — the tool crops
