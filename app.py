@@ -106,8 +106,8 @@ BOOK_SIZES = {
 
 # KDP spine width factor = inches of spine per page
 PAPER_TYPES = {
-    "Trắng — White (B&W interior)": 0.002252,
-    "Ngà — Cream (B&W interior)": 0.0025,
+    "White (B&W interior)": 0.002252,
+    "Cream (B&W interior)": 0.0025,
 }
 
 BLEED_IN = 0.125
@@ -130,16 +130,16 @@ FONTS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # label -> (font file, bold variation name for variable fonts, or None for static fonts)
 FONTS = {
-    "Dễ thương, tròn trịa (trẻ em)": ("Baloo2-Bold.ttf", "Bold"),
-    "Dễ thương, bồng bềnh (trẻ em)": ("Fredoka-Bold.ttf", "Bold"),
-    "Thanh lịch, tương phản cao (người lớn / affirmation)": ("PlayfairDisplay-Bold.ttf", "Bold"),
-    "Thanh lịch, mềm mại (người lớn / affirmation)": ("CormorantGaramond-Bold.ttf", "Bold"),
-    "Hiện đại, gọn gàng (planner / journal)": ("Montserrat-Bold.ttf", "Bold"),
-    "Hiện đại, tròn (planner / journal)": ("Poppins-Bold.ttf", None),
-    "Thư pháp trang trọng (quote book)": ("GreatVibes-Regular.ttf", None),
-    "Thư pháp phóng khoáng (quote book)": ("DancingScript-Bold.ttf", "Bold"),
-    "Đậm, chắc khỏe (đa năng)": ("Anton-Regular.ttf", None),
-    "Đậm, cao gầy (đa năng)": ("BebasNeue-Regular.ttf", None),
+    "Playful, rounded (kids' coloring books)": ("Baloo2-Bold.ttf", "Bold"),
+    "Playful, bouncy (kids' coloring books)": ("Fredoka-Bold.ttf", "Bold"),
+    "Elegant, high-contrast (adult coloring / affirmation)": ("PlayfairDisplay-Bold.ttf", "Bold"),
+    "Elegant, soft (adult coloring / affirmation)": ("CormorantGaramond-Bold.ttf", "Bold"),
+    "Modern, clean (planner / journal)": ("Montserrat-Bold.ttf", "Bold"),
+    "Modern, rounded (planner / journal)": ("Poppins-Bold.ttf", None),
+    "Formal script (quote book)": ("GreatVibes-Regular.ttf", None),
+    "Casual script (quote book)": ("DancingScript-Bold.ttf", "Bold"),
+    "Bold, sturdy (versatile)": ("Anton-Regular.ttf", None),
+    "Bold, tall & narrow (versatile)": ("BebasNeue-Regular.ttf", None),
 }
 
 
