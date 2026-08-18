@@ -99,6 +99,8 @@ if not check_password():
 BOOK_SIZES = {
     "6 × 9 in — Most popular": (6.0, 9.0),
     "8.5 × 11 in — Letter / large coloring book": (8.5, 11.0),
+    "8.5 × 8.5 in — Square (coloring / children's books)": (8.5, 8.5),
+    "8.25 × 8.25 in — Square": (8.25, 8.25),
     "8 × 10 in": (8.0, 10.0),
     "5.5 × 8.5 in — Digest": (5.5, 8.5),
     "5 × 8 in — Compact gift size": (5.0, 8.0),
