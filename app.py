@@ -1,6 +1,7 @@
 import io
+import os
 import streamlit as st
-from PIL import Image, ImageOps, ImageDraw
+from PIL import Image, ImageOps, ImageDraw, ImageFont
 
 # ═══════════════════════════════════════════════════════════════════
 # 🔐 SECURITY SETTINGS — Edit these values to customize your app
@@ -124,6 +125,101 @@ BARCODE_INSET_IN = 0.25
 # trim line (industry-standard guidance) so nothing looks accidentally
 # cropped, even if the physical cutter is slightly off.
 SAFE_ZONE_IN = 0.25
+
+FONTS_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# label -> (font file, bold variation name for variable fonts, or None for static fonts)
+FONTS = {
+    "Dễ thương, tròn trịa (trẻ em)": ("Baloo2-Bold.ttf", "Bold"),
+    "Dễ thương, bồng bềnh (trẻ em)": ("Fredoka-Bold.ttf", "Bold"),
+    "Thanh lịch, tương phản cao (người lớn / affirmation)": ("PlayfairDisplay-Bold.ttf", "Bold"),
+    "Thanh lịch, mềm mại (người lớn / affirmation)": ("CormorantGaramond-Bold.ttf", "Bold"),
+    "Hiện đại, gọn gàng (planner / journal)": ("Montserrat-Bold.ttf", "Bold"),
+    "Hiện đại, tròn (planner / journal)": ("Poppins-Bold.ttf", None),
+    "Thư pháp trang trọng (quote book)": ("GreatVibes-Regular.ttf", None),
+    "Thư pháp phóng khoáng (quote book)": ("DancingScript-Bold.ttf", "Bold"),
+    "Đậm, chắc khỏe (đa năng)": ("Anton-Regular.ttf", None),
+    "Đậm, cao gầy (đa năng)": ("BebasNeue-Regular.ttf", None),
+}
+
+
+def load_font(font_file, variation, size_px):
+    path = os.path.join(FONTS_DIR, font_file)
+    font = ImageFont.truetype(path, size_px)
+    if variation:
+        try:
+            font.set_variation_by_name(variation.encode())
+        except Exception:
+            pass
+    return font
+
+
+def _wrap_text(draw, text, font, max_width_px):
+    words = text.split()
+    if not words:
+        return []
+    lines = []
+    current = words[0]
+    for word in words[1:]:
+        trial = current + " " + word
+        bbox = draw.textbbox((0, 0), trial, font=font)
+        if bbox[2] - bbox[0] <= max_width_px:
+            current = trial
+        else:
+            lines.append(current)
+            current = word
+    lines.append(current)
+    return lines
+
+
+def _draw_centered_block(draw, lines, font, center_x, top_y, fill_color, line_spacing=1.15):
+    y = top_y
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        line_w = bbox[2] - bbox[0]
+        line_h = bbox[3] - bbox[1]
+        draw.text((center_x - line_w / 2, y - bbox[1]), line, font=font, fill=fill_color)
+        y += line_h * line_spacing
+    return y
+
+
+def add_cover_text(
+    canvas, panel_w_px, full_h_px, full_w_px,
+    title, subtitle, author, font_file, font_variation, title_size_pt, text_color_hex,
+):
+    """Draw title/subtitle/author onto the front cover panel (mutates canvas in place)."""
+    draw = ImageDraw.Draw(canvas)
+
+    title_px = round(title_size_pt * DPI / 72)
+    subtitle_px = round(title_px * 0.42)
+    author_px = round(title_px * 0.36)
+
+    front_left = full_w_px - panel_w_px
+    safe_px = round(BLEED_IN * DPI) + round(SAFE_ZONE_IN * DPI)
+    text_left = front_left + safe_px
+    text_right = full_w_px - safe_px
+    max_width_px = text_right - text_left
+    center_x = (text_left + text_right) / 2
+
+    top_y = round(full_h_px * 0.08)
+
+    if title.strip():
+        font = load_font(font_file, font_variation, title_px)
+        lines = _wrap_text(draw, title.strip(), font, max_width_px)
+        top_y = _draw_centered_block(draw, lines, font, center_x, top_y, text_color_hex)
+        top_y += title_px * 0.25
+
+    if subtitle.strip():
+        font = load_font(font_file, font_variation, subtitle_px)
+        lines = _wrap_text(draw, subtitle.strip(), font, max_width_px)
+        _draw_centered_block(draw, lines, font, center_x, top_y, text_color_hex)
+
+    if author.strip():
+        font = load_font(font_file, font_variation, author_px)
+        bbox = draw.textbbox((0, 0), author.strip(), font=font)
+        author_h = bbox[3] - bbox[1]
+        author_y = full_h_px - safe_px - author_h * 1.3
+        _draw_centered_block(draw, [author.strip()], font, center_x, author_y, text_color_hex)
 
 
 def calc_dimensions(trim_w, trim_h, page_count, spine_factor):
@@ -305,6 +401,34 @@ with col_right:
         help="Auto-suggested from your front cover's edge — feel free to change it.",
     )
 
+st.markdown("---")
+st.subheader("✏️ Add Title Text (Optional)")
+add_text = st.checkbox(
+    "Add title / subtitle / author text to the front cover",
+    value=False,
+    help="Turn this OFF if your uploaded front cover image already has text on it — "
+         "otherwise the text will overlap.",
+)
+
+title_text = subtitle_text = author_text = ""
+font_label = list(FONTS.keys())[0]
+title_size_pt = 60
+text_color = "#ffffff"
+
+if add_text:
+    text_col1, text_col2 = st.columns([1, 1], gap="large")
+    with text_col1:
+        title_text = st.text_input("Book title", placeholder="e.g. Hazel's Garden Friends")
+        subtitle_text = st.text_input("Subtitle (optional)", placeholder="e.g. A Cozy Coloring Book")
+        author_text = st.text_input("Author name (optional)", placeholder="e.g. Jane Doe")
+    with text_col2:
+        font_label = st.selectbox("Font style", options=list(FONTS.keys()))
+        title_size_pt = st.number_input(
+            "Title size (pt)", min_value=20, max_value=150, value=60, step=2,
+            help="Subtitle and author name scale automatically from this size.",
+        )
+        text_color = st.color_picker("Text color", value="#ffffff")
+
 if not front_file or not back_file:
     st.markdown(
         "<div class='info-card'>"
@@ -325,6 +449,13 @@ else:
             canvas, full_w_px, full_h_px, spine_w_px, panel_w_px = build_cover(
                 front_img, back_img, trim_w, trim_h, page_count, spine_factor, spine_color
             )
+            if add_text:
+                font_file, font_variation = FONTS[font_label]
+                add_cover_text(
+                    canvas, panel_w_px, full_h_px, full_w_px,
+                    title_text, subtitle_text, author_text,
+                    font_file, font_variation, title_size_pt, text_color,
+                )
             preview_img = add_preview_guides(canvas, panel_w_px, full_h_px)
 
         st.session_state["cover_result"] = {
