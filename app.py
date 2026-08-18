@@ -184,10 +184,10 @@ def _draw_centered_block(draw, lines, font, center_x, top_y, fill_color, line_sp
 
 
 def add_cover_text(
-    canvas, panel_w_px, full_h_px, full_w_px, font_file, font_variation,
-    title, title_size_pt, title_color_hex,
-    subtitle, subtitle_size_pt, subtitle_color_hex,
-    author, author_size_pt, author_color_hex,
+    canvas, panel_w_px, full_h_px, full_w_px,
+    title, title_font_file, title_font_variation, title_size_pt, title_color_hex,
+    subtitle, subtitle_font_file, subtitle_font_variation, subtitle_size_pt, subtitle_color_hex,
+    author, author_font_file, author_font_variation, author_size_pt, author_color_hex,
 ):
     """Draw title/subtitle/author onto the front cover panel (mutates canvas in place)."""
     draw = ImageDraw.Draw(canvas)
@@ -206,18 +206,18 @@ def add_cover_text(
     top_y = round(full_h_px * 0.08)
 
     if title.strip():
-        font = load_font(font_file, font_variation, title_px)
+        font = load_font(title_font_file, title_font_variation, title_px)
         lines = _wrap_text(draw, title.strip(), font, max_width_px)
         top_y = _draw_centered_block(draw, lines, font, center_x, top_y, title_color_hex)
         top_y += title_px * 0.25
 
     if subtitle.strip():
-        font = load_font(font_file, font_variation, subtitle_px)
+        font = load_font(subtitle_font_file, subtitle_font_variation, subtitle_px)
         lines = _wrap_text(draw, subtitle.strip(), font, max_width_px)
         _draw_centered_block(draw, lines, font, center_x, top_y, subtitle_color_hex)
 
     if author.strip():
-        font = load_font(font_file, font_variation, author_px)
+        font = load_font(author_font_file, author_font_variation, author_px)
         bbox = draw.textbbox((0, 0), author.strip(), font=font)
         author_h = bbox[3] - bbox[1]
         author_y = full_h_px - safe_px - author_h * 1.3
@@ -413,35 +413,38 @@ add_text = st.checkbox(
 )
 
 title_text = subtitle_text = author_text = ""
-font_label = list(FONTS.keys())[0]
+title_font_label = subtitle_font_label = author_font_label = list(FONTS.keys())[0]
 title_size_pt, subtitle_size_pt, author_size_pt = 60, 26, 22
 title_color = subtitle_color = author_color = "#ffffff"
 
 if add_text:
-    font_label = st.selectbox("Font style (used for title, subtitle, and author)", options=list(FONTS.keys()))
+    st.caption("Each of Title, Subtitle, and Author can use its own font, size, and color — mix and match as you like.")
 
     st.markdown("**Title**")
-    t_text, t_size, t_color = st.columns([2, 1, 1])
-    with t_text:
-        title_text = st.text_input("Book title", placeholder="e.g. Hazel's Garden Friends", label_visibility="collapsed")
+    title_text = st.text_input("Book title", placeholder="e.g. Hazel's Garden Friends", label_visibility="collapsed", key="title_text")
+    t_font, t_size, t_color = st.columns([2, 1, 1])
+    with t_font:
+        title_font_label = st.selectbox("Font", options=list(FONTS.keys()), key="title_font")
     with t_size:
         title_size_pt = st.number_input("Size (pt)", min_value=20, max_value=150, value=60, step=2, key="title_size")
     with t_color:
         title_color = st.color_picker("Color", value="#ffffff", key="title_color")
 
     st.markdown("**Subtitle (optional)**")
-    s_text, s_size, s_color = st.columns([2, 1, 1])
-    with s_text:
-        subtitle_text = st.text_input("Subtitle", placeholder="e.g. A Cozy Coloring Book", label_visibility="collapsed")
+    subtitle_text = st.text_input("Subtitle", placeholder="e.g. A Cozy Coloring Book", label_visibility="collapsed", key="subtitle_text")
+    s_font, s_size, s_color = st.columns([2, 1, 1])
+    with s_font:
+        subtitle_font_label = st.selectbox("Font", options=list(FONTS.keys()), key="subtitle_font")
     with s_size:
         subtitle_size_pt = st.number_input("Size (pt)", min_value=12, max_value=100, value=26, step=2, key="subtitle_size")
     with s_color:
         subtitle_color = st.color_picker("Color", value="#ffffff", key="subtitle_color")
 
     st.markdown("**Author name (optional)**")
-    a_text, a_size, a_color = st.columns([2, 1, 1])
-    with a_text:
-        author_text = st.text_input("Author name", placeholder="e.g. Jane Doe", label_visibility="collapsed")
+    author_text = st.text_input("Author name", placeholder="e.g. Jane Doe", label_visibility="collapsed", key="author_text")
+    a_font, a_size, a_color = st.columns([2, 1, 1])
+    with a_font:
+        author_font_label = st.selectbox("Font", options=list(FONTS.keys()), key="author_font")
     with a_size:
         author_size_pt = st.number_input("Size (pt)", min_value=12, max_value=100, value=22, step=2, key="author_size")
     with a_color:
@@ -468,12 +471,14 @@ else:
                 front_img, back_img, trim_w, trim_h, page_count, spine_factor, spine_color
             )
             if add_text:
-                font_file, font_variation = FONTS[font_label]
+                title_font_file, title_font_variation = FONTS[title_font_label]
+                subtitle_font_file, subtitle_font_variation = FONTS[subtitle_font_label]
+                author_font_file, author_font_variation = FONTS[author_font_label]
                 add_cover_text(
-                    canvas, panel_w_px, full_h_px, full_w_px, font_file, font_variation,
-                    title_text, title_size_pt, title_color,
-                    subtitle_text, subtitle_size_pt, subtitle_color,
-                    author_text, author_size_pt, author_color,
+                    canvas, panel_w_px, full_h_px, full_w_px,
+                    title_text, title_font_file, title_font_variation, title_size_pt, title_color,
+                    subtitle_text, subtitle_font_file, subtitle_font_variation, subtitle_size_pt, subtitle_color,
+                    author_text, author_font_file, author_font_variation, author_size_pt, author_color,
                 )
             preview_img = add_preview_guides(canvas, panel_w_px, full_h_px)
 
