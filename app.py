@@ -183,6 +183,21 @@ def _draw_centered_block(draw, lines, font, center_x, top_y, fill_color, line_sp
     return y
 
 
+def _fit_wrapped_text(draw, text, font_file, font_variation, size_px, max_width_px, min_size_px=14):
+    """Wrap text at size_px; if any line still overflows (e.g. one very long word,
+    or too large a size for a short title), shrink the font until every line fits."""
+    while True:
+        font = load_font(font_file, font_variation, size_px)
+        lines = _wrap_text(draw, text, font, max_width_px)
+        fits = all(
+            draw.textbbox((0, 0), line, font=font)[2] - draw.textbbox((0, 0), line, font=font)[0] <= max_width_px
+            for line in lines
+        )
+        if fits or size_px <= min_size_px:
+            return font, lines
+        size_px -= 2
+
+
 def add_cover_text(
     canvas, panel_w_px, full_h_px, full_w_px,
     title, title_font_file, title_font_variation, title_size_pt, title_color_hex,
@@ -206,22 +221,20 @@ def add_cover_text(
     top_y = round(full_h_px * 0.08)
 
     if title.strip():
-        font = load_font(title_font_file, title_font_variation, title_px)
-        lines = _wrap_text(draw, title.strip(), font, max_width_px)
+        font, lines = _fit_wrapped_text(draw, title.strip(), title_font_file, title_font_variation, title_px, max_width_px)
         top_y = _draw_centered_block(draw, lines, font, center_x, top_y, title_color_hex)
         top_y += title_px * 0.25
 
     if subtitle.strip():
-        font = load_font(subtitle_font_file, subtitle_font_variation, subtitle_px)
-        lines = _wrap_text(draw, subtitle.strip(), font, max_width_px)
+        font, lines = _fit_wrapped_text(draw, subtitle.strip(), subtitle_font_file, subtitle_font_variation, subtitle_px, max_width_px)
         _draw_centered_block(draw, lines, font, center_x, top_y, subtitle_color_hex)
 
     if author.strip():
-        font = load_font(author_font_file, author_font_variation, author_px)
-        bbox = draw.textbbox((0, 0), author.strip(), font=font)
+        font, lines = _fit_wrapped_text(draw, author.strip(), author_font_file, author_font_variation, author_px, max_width_px)
+        bbox = draw.textbbox((0, 0), lines[-1], font=font)
         author_h = bbox[3] - bbox[1]
-        author_y = full_h_px - safe_px - author_h * 1.3
-        _draw_centered_block(draw, [author.strip()], font, center_x, author_y, author_color_hex)
+        author_y = full_h_px - safe_px - author_h * 1.3 * len(lines)
+        _draw_centered_block(draw, lines, font, center_x, author_y, author_color_hex)
 
 
 def calc_dimensions(trim_w, trim_h, page_count, spine_factor):
